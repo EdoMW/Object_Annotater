@@ -20,12 +20,14 @@ class Config:
 
         self.clean_folder = 3
         self.new_mask = False
-        self.const_part_img_name = 'DSC_0'
-        self.x_input_dim = 4000
-        self.y_input_dim = 6000
-        self.input_image_dim = np.asarray([self.x_input_dim, self.y_input_dim, 3])
+        # self.const_part_img_name = 'DSC_0'
+        # self.x_input_dim = 4000
+        # self.y_input_dim = 6000
+        self.const_part_img_name = ''
+        # self.x_input_dim = 1024
+        # self.y_input_dim = 1024
+        self.input_image_dim = np.asarray([1024, 1024, 3])
         # TODO: change resize_image parameters in utils.
-
 
     def print_menu(self):
         if self.work_type == "new":

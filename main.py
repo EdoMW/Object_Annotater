@@ -20,9 +20,16 @@ def read_image(img_path_to_read):
     read 6000/4000/3 rgb image. resize it. return parameters to later resize the mask to the original size.
     :return: image_resized, scale_ratio, padding_dim
     """
-    image = cv2.imread(img_path_to_read)
-    image_resized, _, scale_ratio, padding_dim, _ = utils.resize_image(image)
-    return image_resized, scale_ratio, padding_dim
+    try:
+        image = cv2.imread(img_path_to_read)
+        config.input_image_dim = np.asarray(image.shape)
+        # self.x_input_dim = config.input_image_dim[0]
+        # self.y_input_dim = 1024
+
+        image_resized, _, scale_ratio, padding_dim, _ = utils.resize_image(image, 1024, 1024)
+        return image_resized, scale_ratio, padding_dim
+    except:
+        print(f"Wrong format of image {img_path_to_read.split('.')[1]}. insert JPG images only.")
 
 
 def show_img(title, image_to_show, x_cord, y_cord):
@@ -198,7 +205,7 @@ def display_image_with_mask(image_path_to_display, mask_path_to_display, mask_np
             mask = a.f.arr_0
             np.save(file=mask_path_to_display, arr=mask)
         except FileNotFoundError:
-            print(f"No exiting annotation yet for image {image_path_to_display[-7:-4]}")
+            # print(f"No exiting annotation yet for image {image_path_to_display[-7:-4]}")
             return
     else:
         mask = np.load(mask_path_to_display)
@@ -215,11 +222,12 @@ def display_image_with_mask(image_path_to_display, mask_path_to_display, mask_np
         if display == 2:
             x_center, y_center = calc_center_of_mass(temp_mask)
             image = cv2.putText(image, str(i), org=(int(y_center), int(x_center)),
-                                fontFace=cv2.FONT_HERSHEY_DUPLEX, fontScale=15,
-                                color=(255, 255, 255), thickness=10, lineType=2)
+                                fontFace=cv2.FONT_HERSHEY_DUPLEX, fontScale=5,
+                                color=(255, 255, 255), thickness=5, lineType=2)
     plt.figure(figsize=(12, 8))
-    plt.title(f'{image_path_to_display[-12:-4]}', fontweight="bold")
+    plt.title(f'{image_path_to_display[:-4]}', fontweight="bold")
     plt.imshow(im)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     plt.imshow(image, 'gray', interpolation='none', alpha=alpha, vmin=1)  # alpha: 0-1, 0 is 100% transparency, 1 is 0%
     plt.show()
     f_name = image_path_to_display[:-4] + '_masked.jpg'
@@ -240,12 +248,12 @@ def calc_center_of_mass(m):
 
 def fix_mask_size(mask):
     x_mask, y_mask, z_mask = mask.shape[0], mask.shape[1], mask.shape[2]
-    x_orig, y_orig, z_orig = config.input_image_dim[0], config.input_image_dim[1], config.input_image_dim[2]
+    x_orig, y_orig, z_orig = config.input_image_dim[0], config.input_image_dim[1], z_mask  # config.input_image_dim[2]
     x_offset, y_offset = 0, 0
     if x_mask == x_orig and y_mask == y_orig:
         return mask
     else:
-        result = np.zeros_like((x_orig, y_orig, z_orig))
+        result = np.zeros((x_orig, y_orig, z_orig))
         if x_mask != x_orig:
             dif_x = abs(x_mask - x_orig)
             if x_mask > x_orig:
@@ -253,6 +261,7 @@ def fix_mask_size(mask):
             else:
                 x_offset = math.floor(dif_x / 2)
                 result[x_offset:mask.shape[0] + x_offset, y_offset:mask.shape[1] + y_offset, :] = mask
+                mask = result
         if y_mask != y_orig:
             dif_y = y_mask - y_orig
             if y_mask > y_orig:
@@ -260,6 +269,7 @@ def fix_mask_size(mask):
             else:
                 y_offset = math.floor(dif_y / 2)
                 result[x_offset:mask.shape[0] + x_offset, y_offset:mask.shape[1] + y_offset, :] = mask
+                mask = result
     return mask
 
 
@@ -304,7 +314,7 @@ def annotate_image(new_mask_ann=True):
                 npy_array = np.dstack((npy_array, npys_list[arr]))
         else:  # 1024,1024 is for squre image in this dim. can be changed.
             npy_array = np.reshape(npy_array, (1024, 1024, 1))
-        npy_array = npy_array[170:853, :, :]  # remove the padding
+        # npy_array = npy_array[170:853, :, :]  # remove the padding
         mask = utils.resize_mask(npy_array, 1 / scale, padding=0, crop=None)  # make it [4002,6000,N]
         mask = fix_mask_size(mask)
         # mask = mask[1:4001, :, :]  # fix the resizing
@@ -321,7 +331,7 @@ def fix_mask(image_path, mask_path, mask_path_npz):
     continue to annotate new masks.
     """
     _ = display_image_with_mask(image_path_to_display=image_path, mask_path_to_display=mask_path,
-                            mask_npz_path=mask_path_npz, display=1)
+                                mask_npz_path=mask_path_npz, display=1)
     annotate_image(config.new_mask)
 
 
@@ -336,6 +346,7 @@ def print_information(images_list_to_display, npz_l_images):
     :param images_list_to_display: images dir
     :param npz_l_images: npzs dir
     """
+    # images_len = len([x for x in os.listdir('images') if x[-7:-4] != 'ked'])
     images_len = len([x for x in os.listdir('images') if x[-7:-4] != 'ked'])
     if len(images_list_to_display) > 0:
         if config.work_type == "new":
@@ -346,11 +357,14 @@ def print_information(images_list_to_display, npz_l_images):
                   f'total of {len(images_list_to_display)} select image to fix/add annotations]')
     else:
         print("All images have been annotated!")
-        answer = input("Enter 5 to view list of annotated images, Enter otherwise: ")
+        answer = input("Enter 5 to view list of annotated images, Enter otherwise: \n")
         if answer.isdigit():
             if int(answer) == 5:
-                npz_l_images = [x[-7:-4] for x in npz_l_images]
+                # npz_l_images = [x[-7:-4] for x in npz_l_images]
+                npz_l_images = [x[:-4] for x in npz_l_images]
                 print("npz_l_images: ", npz_l_images)
+                return True
+    return False
 
 
 def choose_work_type():
@@ -378,34 +392,40 @@ def print_next_images():
     """
     images_list = os.listdir('images')
     npz_list = os.listdir('npzs')
-    npz_list_images = [x[:-4] + '.JPG' for x in npz_list]
+    npz_list_images = [x[:-4] + '.jpg' for x in npz_list]
     if config.work_type == "new":
-        images_list = [x for x in images_list if x not in npz_list_images]
-        images_list = [x[-7:-4] for x in images_list if x[-7:-4] != 'ked']
+        images_list = [x for x in images_list if x not in npz_list_images and x[-7:-4] != 'ked']
+        # images_list = [x[-7:-4] for x in images_list if x[-7:-4] != 'ked']
+        images_list = [x[:-4] for x in images_list if x[:-4] != 'ked']
     else:
-        images_list = [x[-7:-4] for x in images_list if x in npz_list_images]
+        # images_list = [x[-7:-4] for x in images_list if x in npz_list_images]
+        images_list = [x[:-4] for x in images_list if x in npz_list_images]
 
-    print_information(images_list, npz_list_images)
-    return images_list[0] if len(images_list) > 0 else None
+    allow_choice = print_information(images_list, npz_list_images)
+    return images_list[0] if len(images_list) > 0 else None, allow_choice
 
 
-def select_image(im_num):
+def select_image(im_num, pick_number):
     """
     Enter image number
     :return: image number
     """
     option_1 = None
     const_img_name = config.const_part_img_name
-    if img_num is None:
+    if img_num is None and not pick_number:
         return "skip"
     while True:
         option_1 = const_img_name + str(input(f"{im_num} selected. Press enter to confirm"
                                               f" or insert 3 digits to select other image: "))
-        if option_1[-3:].isdecimal():
-            break
-        elif option_1[5:] == "":
-            option_1 += im_num
-            break
+        # if option_1[-3:].isdecimal():
+        if option_1 is not None:
+            # to verify fiverr images
+            # if all([x for x in option_1.split('_') if x.isdecimal]) and len(option_1.split('_')) == 4:
+            if option_1 != "":
+                break
+            elif option_1[len(const_img_name):] == "":
+                option_1 += im_num
+                break
     return option_1
 
 
@@ -499,8 +519,14 @@ def change_work_type():
 
 def delete_masks(image_path, mask_path, mask_path_npz):
     masks_count = display_image_with_mask(image_path_to_display=image_path, mask_path_to_display=mask_path,
-                            mask_npz_path=mask_path_npz, display=2)
+                                          mask_npz_path=mask_path_npz, display=2)
+    empty_file = False
     while True:
+        if masks_count == 0:
+            print("No masks to delete")
+            if mask_path_npz is not None:
+                empty_file = True
+            break
         mask_to_rem = str(input("Please enter mask number to delete"))
         if mask_to_rem.isdigit():
             if int(0 <= int(mask_to_rem) < masks_count):
@@ -511,9 +537,12 @@ def delete_masks(image_path, mask_path, mask_path_npz):
                 # mask = np.delete(mask, mask[:, :, int(mask_to_rem)])
                 print(mask.shape)
                 print(mask_path_npz)
-                np.savez_compressed(mask_path_npz,mask)
+                if mask.shape[2] > 0:
+                    np.savez_compressed(mask_path_npz, mask)
+                else:
+                    masks_count = 0
                 _ = display_image_with_mask(image_path_to_display=image_path, mask_path_to_display=mask_path,
-                                                      mask_npz_path=mask_path_npz, display=2)
+                                            mask_npz_path=mask_path_npz, display=2)
             else:
                 print(f"Please enter number between 0 to {masks_count} to delete the mask")
         elif mask_to_rem == "":
@@ -521,6 +550,13 @@ def delete_masks(image_path, mask_path, mask_path_npz):
             break
         else:
             print("Please enter valid mask number, or press enter to exit")
+    return empty_file
+
+
+def del_masks(*args):
+    del_file = delete_masks(*args)
+    if del_file:
+        os.remove(mask_path_npz)
 
 
 def take_action(option, image_path, mask_path, mask_path_npz, config):
@@ -537,7 +573,7 @@ def take_action(option, image_path, mask_path, mask_path_npz, config):
     elif option == 5:
         return True
     elif option == 6:
-        delete_masks(image_path, mask_path, mask_path_npz)
+        del_masks(image_path, mask_path, mask_path_npz)
     return False
 
 
@@ -550,8 +586,8 @@ if __name__ == "__main__":
     image_path, mask_path, mask_path_npz = None, None, None
     while True and not end_program:
         gc.collect()
-        img_num = print_next_images()
-        name = select_image(img_num)
+        img_num, pick_num = print_next_images()
+        name = select_image(img_num, pick_num)
         if name == 'skip':
             change_work_type()
             # continue
