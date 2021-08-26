@@ -1,14 +1,13 @@
 import os
 import shutil
-
-import cv2
-import scipy
-
-import utils
 import math
 from random import randint
 import matplotlib.pyplot as plt
 import gc
+import cv2
+import scipy
+
+import utils
 from config import *
 
 screen_x_cord, screen_y_cord = config.screen_x_cord, config.screen_y_cord
@@ -350,20 +349,28 @@ def print_information(images_list_to_display, npz_l_images):
     images_len = len([x for x in os.listdir('images') if x[-7:-4] != 'ked'])
     if len(images_list_to_display) > 0:
         if config.work_type == "new":
-            print(f'Following images have not been annotated yet {images_list_to_display[:4]}, '
-                  f'total of {len(images_list_to_display)} remained out of {images_len} images]')
+            print(f'{images_list_to_display}, \n'
+                  f'{len(images_list_to_display)}/{images_len} images in total have not been annotated yet')
         else:
-            print(f'Following images have been annotated {images_list_to_display[:4]}, '
-                  f'total of {len(images_list_to_display)} select image to fix/add annotations]')
+            print(f'{images_list_to_display},\n '
+                  f'{len(images_list_to_display)}/{images_len} images in total have been annotated,'
+                  f' select image to fix annotations')
     else:
         print("All images have been annotated!")
-        answer = input("Enter 5 to view list of annotated images, Enter otherwise: \n")
-        if answer.isdigit():
-            if int(answer) == 5:
-                # npz_l_images = [x[-7:-4] for x in npz_l_images]
-                npz_l_images = [x[:-4] for x in npz_l_images]
-                print("npz_l_images: ", npz_l_images)
-                return True
+        # answer = input("Enter 5 to view list of annotated images, Enter otherwise: \n")
+        # if answer.isdigit():
+        #     if int(answer) == 5:
+
+        # npz_l_images = [x[-7:-4] for x in npz_l_images]
+        npz_l_images = [x[:-4] for x in npz_l_images if x[-7:-4] != 'ked']
+        checked_list = os.listdir('checked')
+        checked_list = [x[:-4] for x in checked_list]
+        npz_l_images = [x for x in npz_l_images if x not in checked_list]
+        print("annotated images: ", npz_l_images)
+        num = verify_choice(npz_l_images, True) # (npz_l_images, answer)
+        return num
+        # else:
+        #     return False
     return False
 
 
@@ -386,37 +393,59 @@ def choose_work_type():
             print("Please choose valid option")
 
 
+def verify_choice(npz_list_images, allow_choice):
+    pick = allow_choice
+    npz_list_images = [x for x in npz_list_images]
+    # print()
+    # pick = input(f"{npz_list_images} \n Choose image")
+    if len(npz_list_images) > 0:
+        pick = input(f"{npz_list_images[0]} selected. press enter to confirm, or Choose another image")
+    else:
+        print("No more new images to annotate. switching to view annotated images.")
+        return pick
+    while True:
+        if pick == "":
+            pick = npz_list_images[0]
+        if pick in npz_list_images:
+            break
+        pick = input(f"illegal choice. select from annotated list :\n")
+                     # f"{[x for x in npz_list_images if x[-7:-4] != 'ked']} \n")
+    return pick
+
+
 def print_next_images():
     """
     print information about the images
     """
     images_list = os.listdir('images')
     npz_list = os.listdir('npzs')
+    checked_list = os.listdir('checked')
+    checked_list = [x[:-4] for x in checked_list]
     npz_list_images = [x[:-4] + '.jpg' for x in npz_list]
     if config.work_type == "new":
         images_list = [x for x in images_list if x not in npz_list_images and x[-7:-4] != 'ked']
-        # images_list = [x[-7:-4] for x in images_list if x[-7:-4] != 'ked']
         images_list = [x[:-4] for x in images_list if x[:-4] != 'ked']
+        images_list = [x for x in images_list if x not in checked_list]
     else:
-        # images_list = [x[-7:-4] for x in images_list if x in npz_list_images]
         images_list = [x[:-4] for x in images_list if x in npz_list_images]
+        images_list = [x for x in images_list if x not in checked_list]
+        allow_choice = print_information(images_list, npz_list_images)
+        return allow_choice
+    return images_list[0] if len(images_list) > 0 else None
 
-    allow_choice = print_information(images_list, npz_list_images)
-    return images_list[0] if len(images_list) > 0 else None, allow_choice
 
-
-def select_image(im_num, pick_number):
+def select_image(img_num):
     """
     Enter image number
     :return: image number
     """
     option_1 = None
     const_img_name = config.const_part_img_name
-    if img_num is None and not pick_number:
+    if img_num is None:
         return "skip"
     while True:
-        option_1 = const_img_name + str(input(f"{im_num} selected. Press enter to confirm"
-                                              f" or insert 3 digits to select other image: "))
+        option_1 = const_img_name + str(input(f"{img_num} selected. Press enter to confirm"
+                                              f" or insert image name: "))
         # if option_1[-3:].isdecimal():
         if option_1 is not None:
             # to verify fiverr images
@@ -424,7 +453,7 @@ def select_image(im_num, pick_number):
             if option_1 != "":
                 break
             elif option_1[len(const_img_name):] == "":
-                option_1 += im_num
+                option_1 += img_num
                 break
     return option_1
 
@@ -481,10 +510,14 @@ def init_folders():
         print("Move images that you want to annotate, to the new directory 'images'")
         end_prog = True
     elif len(os.listdir('images')) == 0:
-        print("Images directory is empty. insert images to annotate")
+        print("Images directory is empty. insert images to annotate and run again")
         end_prog = True
     if not os.path.exists('npys'): os.mkdir('npys')
     if not os.path.exists('npzs'): os.mkdir('npzs')
+    if not os.path.exists('checked'): os.mkdir('checked')
+    if any([x for x in os.listdir('images') if not (x.endswith('.JPG') or x.endswith('.jpg'))]):
+        print("At least one image is not JPG")
+        end_prog = True
     remove_masked_images()
     return end_prog
 
@@ -559,22 +592,52 @@ def del_masks(*args):
         os.remove(mask_path_npz)
 
 
+def check_image(image_path):
+    """
+    Mark images as checked if no more work is required
+    :param image_path: image to be checked
+    """
+    while True:
+        check_file = input("Enter 1 to mark annotation is good, 0 otherwise: ")
+        if check_file.isdigit():
+            if int(check_file) == 1:
+                name = 'checked/' + image_path.split('/')[1][:-3] + 'txt'
+                with open(name, 'w') as fp:
+                    "checked"
+                break
+            elif int(check_file) == 0:
+                break
+        else:
+            print("Insert valid input (1 or 0)")
+
+
 def take_action(option, image_path, mask_path, mask_path_npz, config):
     if option == 1:
         display_image_with_mask(image_path_to_display=image_path,
                                 mask_path_to_display=mask_path,
                                 mask_npz_path=mask_path_npz)
+        check_image(image_path)
     elif option == 2:
         fix_mask(image_path, mask_path, mask_path_npz)
+        check_image(image_path)
     elif option == 3:
         annotate_new_image(config.new_mask)
+        check_image(image_path)
     elif option == 4:
         change_work_type()
     elif option == 5:
         return True
     elif option == 6:
         del_masks(image_path, mask_path, mask_path_npz)
+        check_image(image_path)
     return False
+
+
+def end_prog():
+    """
+    check if all images have been checked
+    :return: True if yes, else False
+    """
 
 
 if __name__ == "__main__":
@@ -586,9 +649,11 @@ if __name__ == "__main__":
     image_path, mask_path, mask_path_npz = None, None, None
     while True and not end_program:
         gc.collect()
-        img_num, pick_num = print_next_images()
-        name = select_image(img_num, pick_num)
+        img_name = print_next_images()
+        name = select_image(img_name)
         if name == 'skip':
+            if end_prog():
+                break
             change_work_type()
             # continue
         else:

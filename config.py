@@ -8,7 +8,7 @@ class Config:
         self.screen_y_cord = -270
         self.show_obb = False
         self.work_type = "not defined yet"
-        self.menu_new = "Enter 1 for annotating new image \n"\
+        self.menu_new = "Enter 1 for annotate new image/re-annotate image \n"\
                         f"Enter 2 to change work type- current is {self.work_type} \n"\
                         "Enter 3 to exit"
         self.menu_fix = "Enter 1 for display old masks \n"\
