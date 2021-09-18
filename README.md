@@ -9,3 +9,5 @@ It was made for the porpuse of small corections needed in the dataset, and it's 
 2) Annotate new image.
 3) Add masks to annotated image.
 4) Delete masks from annotated image.
+
+# Important! the project was only tested on pycharm versions 2021 and above with windows 10.
