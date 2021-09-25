@@ -27,6 +27,7 @@ class Config:
         # self.x_input_dim = 1024
         # self.y_input_dim = 1024
         self.input_image_dim = np.asarray([1024, 1024, 3])
+        self.pre_allocated = False
         # TODO: change resize_image parameters in utils.
 
     def print_menu(self):

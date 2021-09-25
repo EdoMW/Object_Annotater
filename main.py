@@ -444,8 +444,10 @@ def select_image(img_num):
     if img_num is None:
         return "skip"
     while True:
-        option_1 = const_img_name + str(input(f"{img_num} selected. Press enter to confirm"
-                                              f" or insert image name: "))
+        option_1 = const_img_name + str(img_num)
+        print(f"Image chosen name: {option_1}")
+        # option_1 = const_img_name + str(input(f"{img_num} selected. Press enter to confirm"
+        #                                       f" or insert image name: "))
         # if option_1[-3:].isdecimal():
         if option_1 is not None:
             # to verify fiverr images
@@ -522,21 +524,14 @@ def init_folders():
     return end_prog
 
 
-def convert_annotations():
+def make_paths(image_name):
     """
-    TODO: convert annotations to different formats.
-    """
-    pass
-
-
-def make_paths(img_name):
-    """
-    :param img_name: image number
+    :param image_name: image number
     :return: paths to image, mask and mask path.
     """
-    image_p = 'images/' + img_name + '.JPG'
-    mask_p = 'npys/' + img_name + '.npy'
-    mask_path_n = 'npzs/' + img_name + '.npz'
+    image_p = 'images/' + image_name + '.JPG'
+    mask_p = 'npys/' + image_name + '.npy'
+    mask_path_n = 'npzs/' + image_name + '.npz'
     return image_p, mask_p, mask_path_n
 
 
@@ -638,6 +633,10 @@ def end_prog():
     check if all images have been checked
     :return: True if yes, else False
     """
+    if len(os.listdir(r'npzs')) == len(os.listdir(r'images')):
+        print("All images have been checked. End of program")
+        return True
+    return False
 
 
 if __name__ == "__main__":
@@ -662,5 +661,4 @@ if __name__ == "__main__":
         end_program = take_action(option, image_path, mask_path, mask_path_npz, config)
         if len(os.listdir(r'npys')) > config.clean_folder:
             clean_npy_dir()
-    convert_annotations()
     clean_npy_dir()
