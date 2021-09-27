@@ -86,36 +86,137 @@ def connected_dots(binary_map):
 
     # get CC_STAT_AREA component as stats[label, COLUMN]
     areas = stats[1:, cv.CC_STAT_AREA]
+    widths = stats[1:, cv.CC_STAT_WIDTH]
+    heights = stats[1:, cv.CC_STAT_HEIGHT]
     result = np.zeros((labels.shape), np.uint8)
 
     for i in range(0, nlabels - 1):
-        if areas[i] >= 20:  # keep
+        if areas[i] >= 30:
+        # if areas[i] >= 30 and 0.33 < widths[i] / heights[i] < 3 and 200 < widths[i]*heights[i]:  # filter
             result[labels == i + 1] = 255
+
+    result = cv.dilate(result, kernel=np.ones((2, 2), np.uint8), iterations=1)  # make the lines thicker
     show_in_moved_window_double(win_name="Remove dots", img_1=binary_map, img_2=result, x=-1450, y=-200)
+    plt.figure()
+    plt.axis("on")
+    plt.imshow(result)
+    plt.show()
     return result
 
 
-def canny(working_copy, gaussian, laplace, close_morpho, open_morpho):
+def adaptive_threshold(image_guss, img_color):
+    thresh = cv.adaptiveThreshold(image_guss, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY_INV, 11, 2)
+    contours, hierarchy = cv.findContours(thresh.copy(), cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE)
+    contour_list = []
+    for contour in contours:
+        approx = cv.approxPolyDP(contour, 0.01 * cv.arcLength(contour, True), True)
+        area = cv.contourArea(contour)
+        # Filter based on length and area
+        print(len(approx), area)
+        if (2 < len(approx) < 18) & (900 > area > 20):
+            # print area
+            contour_list.append(contour)
+
+    cv.drawContours(img_color, contour_list, -1, (255, 20, 20), 2)
+    cv.imshow('Objects Detected', img_color)
+    cv.waitKey(5000)
+
+
+def circles(image_guss, img_color):
+    circles = cv.HoughCircles(image_guss, cv.HOUGH_GRADIENT, 1, minDist=30,
+                               param1=40, param2=20, minRadius=0, maxRadius=50)
+    if circles is not None:
+        for i in circles[0, :]:
+            # draw the outer circle
+            cv.circle(img_color, (int(i[0]), int(i[1])), int(i[2]), (0, 255, 0), 2)
+            # draw the center of the circle
+            # cv.circle(img_color, (i[0], i[1]), 2, (0, 0, 255), 3)
+
+    cv.imshow('circles', img_color)
+    cv.waitKey(5000)
+
+
+def show_hist(img):
+    histogram, bin_edges = np.histogram(img, bins=256, range=(0, 1))
+    hist = cv.calcHist([img], [0], None, [256], [1, 256])
+    plt.figure()
+    plt.axis("off")
+    plt.imshow(cv.cvtColor(img, cv.COLOR_GRAY2RGB))
+    # img *= 2 #FIXME
+    # cv.imshow("ggg", img)
+    # cv.waitKey()
+    # plot the histogram
+    plt.figure()
+    plt.title("Grayscale Histogram")
+    plt.xlabel("Bins")
+    plt.ylabel("# of Pixels")
+    plt.plot(hist)
+    plt.xlim([0, 256])
+
+    # plt.show()
+    # plot the normalized histogram
+    # hist /= hist.sum()
+    # plt.figure()
+    # plt.title("Grayscale Histogram (Normalized)")
+    # plt.xlabel("Bins")
+    # plt.ylabel("% of Pixels")
+    # plt.plot(hist)
+    # plt.xlim([0, 256])
+    # plt.show()
+    # show_in_moved_window(win_name="Gray", img=histogram, x=-1450, y=-200)
+
+    img_bgr = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
+    img_yuv = cv.cvtColor(img_bgr, cv.COLOR_BGR2YUV)
+
+    # equalize the histogram of the Y channel
+    img_yuv[:, :, 0] = cv.equalizeHist(img_yuv[:, :, 0])
+    # convert the YUV image back to RGB format
+    img_output = cv.cvtColor(img_yuv, cv.COLOR_YUV2BGR)
+    # show_in_moved_window('Color input image', img_bgr)
+    # show_in_moved_window('Histogram equalized', img_output)
+    # show_in_moved_window('Histogram equalized', img_output)
+    img_output_bgr = cv.cvtColor(img_yuv, cv.COLOR_YUV2BGR)
+    img_output_gray = cv.cvtColor(img_output_bgr, cv.COLOR_BGR2GRAY)
+    # show_in_moved_window('Histogram equalized', img_output_gray)
+    return img_output_gray
+    # return img
+
+
+def canny(img_color, working_copy, gaussian, laplace, close_morpho, open_morpho):
     grayscale = cv.cvtColor(working_copy, cv.COLOR_RGB2GRAY)  # convert to grayscale
     threshValue = 140
     _, binaryImage = cv.threshold(grayscale, threshValue, 255, cv.THRESH_TOZERO_INV)  # remove white areas
-
+    # show_in_moved_window(win_name="Gray", img=binaryImage, x=-1450, y=-200)
+    binaryImage = show_hist(binaryImage)
     # apply gaussian blur before canny edge detection
     if gaussian:
         kernel_size = 3
         gaussian_blurred = cv.GaussianBlur(binaryImage, (kernel_size, kernel_size), 0)
         # show_in_moved_window_double(win_name="Gaussian", img_1=binaryImage, img_2=gaussian_blurred, x=-1450, y=-200)
-        binaryImage = gaussian_blurred
+        binaryImage_2 = gaussian_blurred.copy()
+        binaryImage = gaussian_blurred.copy()
+        # gaussian_blurred_2 = cv.GaussianBlur(binaryImage_2, (kernel_size*3, kernel_size*3), 0)
+        # show_in_moved_window_double(win_name="Gaussian2", img_1=binaryImage_2, img_2=gaussian_blurred_2, x=-1450, y=-200)
+        # binaryImage = gaussian_blurred
     if laplace:
         laplacian = cv.Laplacian(binaryImage, cv.CV_64F, ksize=7)
-        # show_in_moved_window("laplacian", laplacian)
+        show_in_moved_window("laplacian", laplacian)
         binaryImage = laplacian
-    # low_threshold, high_threshold = 12, 35
-    # edges = cv.Canny(gaussian_blurred, low_threshold, high_threshold)
+    binaryImage = binaryImage.astype('uint8')
+    # low_threshold, high_threshold = 50, 125
+    # edges = cv.Canny(binaryImage, low_threshold, high_threshold)
+    # show_in_moved_window("binaryImage before canny", binaryImage)
     th, bw = cv.threshold(binaryImage, 0, 255, cv.THRESH_BINARY | cv.THRESH_OTSU)  # calc threshold for canny
-    edges = cv.Canny(binaryImage, th / 2, th)
+    edges = cv.Canny(binaryImage, th*0.7, th*1.2)
     # show_in_moved_window("canny", edges)
     edges = connected_dots(edges)
+
+    # rgb_double = cv.cvtColor(binaryImage, cv.COLOR_GRAY2RGB)  # FIXME
+    # circles(binaryImage, rgb_double) # FIXME
+    # adaptive_threshold(binaryImage, img_color)  # not detecting anything..
+
+
+
 
     kernel = np.ones((3, 3), np.uint8)
     if close_morpho:
@@ -126,12 +227,17 @@ def canny(working_copy, gaussian, laplace, close_morpho, open_morpho):
         edges_2 = cv.morphologyEx(edges, cv.MORPH_OPEN, kernel)
         # show_in_moved_window_double(win_name="morphology", img_1=edges_4, img_2=edges_2, x=-1450, y=-200)
         edges = edges_2
+
+    from skimage.transform import hough_ellipse
+    from skimage.draw import ellipse_perimeter
+    from skimage import data, color, img_as_ubyte
+
     return edges, binaryImage
 
 count = 0
 for dir in old_exps:
     count += 1
-    if count < 12:
+    if count < 15:
         continue
     dir = os.path.join(old_exp_path, dir)
     dir_masks = os.path.join(dir, "masks")
@@ -174,7 +280,7 @@ for dir in old_exps:
             imask = mask > 0
             green = np.zeros_like(working_copy, np.uint8)
             green[imask] = working_copy[imask]
-            show_in_moved_window("green", green)
+            # show_in_moved_window("green", green)
 
             working_copy = green.copy()
 
@@ -191,10 +297,10 @@ for dir in old_exps:
             # show_in_moved_window('Sobel Y', sobely)
             # show_in_moved_window('Sobel XY', sobelxy)
 
-            image_canny, thresholded_image = canny(working_copy=working_copy, gaussian=True, laplace=False,
+            image_canny, filterd_binary_img = canny(img_color=green, working_copy=working_copy, gaussian=True, laplace=False,
                                                    open_morpho=False, close_morpho=False)
             show_in_moved_window_double(win_name=f'{pairs[i][2]}, after morpho, gussian, binary, canny',
-                                        img_1=image_canny, img_2=green, i=None, x=-1450, y=-200)  # Laptop only
+                                        img_1=image_canny, img_2=filterd_binary_img, i=None, x=-1450, y=-200)  # Laptop only
             # show_in_moved_window(win_name=f'{pairs[i][2]}', img=image_canny, i=None, x=0, y=0)  # Laptop only
             # show_in_moved_window(win_name=f'{pairs[i][2]}', img=redMask, i=None, x=0, y=0) # Laptop only
             # show_in_moved_window(win_name=f'{pairs[i][2]}',
