@@ -1,6 +1,6 @@
 # Object_Annotater
 
-This project is a python based tool for image annotation in instance segmentation level, for binary class anotation.
+This project is a python based tool for image annotation in instance segmentation level, for binary class annotation.
 
 It was made for the porpuse of small corections needed in the dataset annotations, and it's ideal for images that don't require zoom in, meaning that you could annotate the image using average size screen. It's also a good option for annotationg small sizes datasets.
 
