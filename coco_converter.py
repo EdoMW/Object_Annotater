@@ -7,7 +7,7 @@ from sklearn.model_selection import train_test_split
 
 from config import *
 
-
+# Not ready yet.
 categories = [{"id": 1, "name": "grape", "supercategory": "grapes", }]
 licenses = [{"url": "http://creativecommons.org/licenses/by-nc-sa/2.0/", "id": 0,
              "name": "Attribution-NonCommercial-ShareAlike License"}]
